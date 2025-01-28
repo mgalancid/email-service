@@ -1,13 +1,11 @@
 package com.mindhub.email_service.controllers;
 
+import com.mindhub.email_service.dtos.EmailTemplateRequest;
 import com.mindhub.email_service.services.impl.EmailServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
@@ -49,13 +47,14 @@ public class EmailController {
     }
 
     @PostMapping("/send-template")
-    public String sendTemplateEmail(
-            @RequestParam String to,
-            @RequestParam String subject,
-            @RequestParam String name,
-            @RequestParam String message) {
-
-        emailService.sendTemplateEmail(to, subject, name, message);
+    public String sendTemplateEmail(@RequestBody EmailTemplateRequest emailRequest) {
+        emailService.sendTemplateEmail(
+                emailRequest.getTo(),
+                emailRequest.getSubject(),
+                emailRequest.getName(),
+                emailRequest.getMessage()
+        );
         return "Correo con template enviado exitosamente!";
     }
+
 }
