@@ -50,7 +50,11 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public void sendTemplateEmail(String to, String subject, String... templateArgs) {
-        String text = String.format(template.getText(), (Object[]) templateArgs);
+        String templateText = template.getText();
+        if (templateText == null) {
+            throw new IllegalArgumentException("Template text cannot be null");
+        }
+        String text = String.format(templateText, (Object[]) templateArgs);
         sendEmail(to, subject, text);
     }
 }
