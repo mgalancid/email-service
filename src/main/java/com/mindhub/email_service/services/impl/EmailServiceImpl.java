@@ -53,11 +53,16 @@ public class EmailServiceImpl implements EmailService {
 
     @RabbitListener(queues = "createOrder")
     public void receiveOrder(NewOrderEntityDTO newOrderEntityDTO) {
+        System.out.println(newOrderEntityDTO);
         if (newOrderEntityDTO == null) {
             throw new RuntimeException("Received null order data from RabbitMQ");
         }
 
         String userEmail = newOrderEntityDTO.getUserEmail();
+
+        if (userEmail == null || userEmail.isEmpty()) {
+            throw new IllegalArgumentException("User email cannot be null or empty.");
+        }
 
         StringBuilder body = getStringBuilder(newOrderEntityDTO, userEmail);
 
