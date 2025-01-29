@@ -1,8 +1,18 @@
 package com.mindhub.email_service.services.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mindhub.email_service.dtos.NewOrderEntityDTO;
+import com.mindhub.email_service.dtos.NewOrderItemEntityDTO;
+import com.mindhub.email_service.dtos.NewUserEntityDTO;
+import com.mindhub.email_service.dtos.UserEntityDTO;
+import com.mindhub.email_service.models.EmailDetails;
 import com.mindhub.email_service.services.EmailService;
 import jakarta.mail.internet.MimeMessage;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -13,19 +23,79 @@ import java.io.File;
 
 @Service
 public class EmailServiceImpl implements EmailService {
+    private static final Log log = LogFactory.getLog(EmailServiceImpl.class);
     @Autowired
     private JavaMailSender mailSender;
 
     @Autowired
     private SimpleMailMessage template;
 
+    @Value("${spring.mail.username}")
+    private String sender;
+
+    public void receiveOrder(NewOrderEntityDTO newOrderEntityDTO) {
+        if (newOrderEntityDTO == null) {
+            throw new RuntimeException("Received null order data from RabbitMQ");
+        }
+
+        StringBuilder body = getStringBuilder(newOrderEntityDTO);
+
+        EmailDetails emailDetails = new EmailDetails();
+        emailDetails.setFrom("noreply@example.com");
+        emailDetails.setTo(newOrderEntityDTO.getUserEmail());
+        emailDetails.setSubject("Order Confirmation");
+        emailDetails.setBody(body.toString());
+
+        sendEmailWithAttachment(emailDetails.getTo(), emailDetails.getSubject(), emailDetails.getBody(), null);
+    }
+
+    private static StringBuilder getStringBuilder(NewOrderEntityDTO newOrderEntityDTO) {
+        StringBuilder body = new StringBuilder("Dear " + newOrderEntityDTO.getUserEmail() + ",\n\n" +
+                "Your order has been created successfully. Your order status is: " + newOrderEntityDTO.getStatus() + ".\n\n");
+
+        body.append("Order Details:\n");
+
+        for (NewOrderItemEntityDTO item : newOrderEntityDTO.getProducts()) {
+            body.append("- Product ID: ").append(item.getProductId()).append(", Quantity: ").append(item.getQuantity()).append("\n");
+        }
+
+        body.append("\nThank you for shopping with us!");
+        return body;
+    }
+
+    @RabbitListener(queues = "registerUser")
+    public void processUserRegistration(NewUserEntityDTO newUserDTO) {
+        try {
+            if (newUserDTO.getEmail() == null || newUserDTO.getEmail().isEmpty()) {
+                log.error("No recipient email address found. Email cannot be sent.");
+                return;
+            }
+
+            EmailDetails emailDetails = new EmailDetails(
+                    "noreply@example.com",
+                    newUserDTO.getEmail(),
+                    "Welcome!",
+                    "Hello " + newUserDTO.getUsername() + ", welcome to our platform!"
+            );
+
+            sendEmail(emailDetails);
+            log.info("Welcome email sent successfully to: " + emailDetails.getTo());
+        } catch (Exception e) {
+            log.error("Error processing user registration message: ", e);
+        }
+    }
+
     @Override
-    public void sendEmail(String to, String subject, String body) {
+    public void sendEmail(EmailDetails emailDetails) {
         SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(to);
-        message.setSubject(subject);
-        message.setText(body);
+        String from = emailDetails.getFrom() != null ? emailDetails.getFrom() : sender;
+        message.setFrom(from);
+        message.setTo(emailDetails.getTo());
+        message.setSubject(emailDetails.getSubject());
+        message.setText(emailDetails.getBody());
+
         mailSender.send(message);
+        log.info("Welcome email sent successfully to: " + emailDetails.getTo());
     }
 
     @Override
@@ -46,15 +116,5 @@ public class EmailServiceImpl implements EmailService {
         } catch (Exception e) {
             throw new RuntimeException("Error enviando correo con adjunto", e);
         }
-    }
-
-    @Override
-    public void sendTemplateEmail(String to, String subject, String... templateArgs) {
-        String templateText = template.getText();
-        if (templateText == null) {
-            throw new IllegalArgumentException("Template text cannot be null");
-        }
-        String text = String.format(templateText, (Object[]) templateArgs);
-        sendEmail(to, subject, text);
     }
 }
