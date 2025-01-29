@@ -30,18 +30,27 @@ public class EmailController {
             @RequestParam String body,
             @RequestParam("attachment") MultipartFile attachment) {
 
+        if (attachment.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Attachment is required and cannot be empty.");
+        }
+
+        File tempFile = null;
         try {
-            File tempFile = File.createTempFile("attachment-", attachment.getOriginalFilename());
+            tempFile = File.createTempFile("attachment-", attachment.getOriginalFilename());
             attachment.transferTo(tempFile);
 
             emailService.sendEmailWithAttachment(to, subject, body, tempFile.getAbsolutePath());
-
-            tempFile.delete();
 
             return ResponseEntity.ok("Correo con adjunto enviado exitosamente!");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error enviando correo: " + e.getMessage());
+        } finally {
+            if (tempFile != null && tempFile.exists()) {
+                tempFile.delete();
+            }
         }
     }
+
 }

@@ -24,11 +24,32 @@ public class EmailServiceImpl implements EmailService {
     @Autowired
     private JavaMailSender mailSender;
 
-    @Autowired
-    private SimpleMailMessage template;
-
     @Value("${spring.mail.username}")
     private String sender;
+
+    /// Rabbit Listener
+
+    @RabbitListener(queues = "registerUser")
+    public void processUserRegistration(NewUserEntityDTO newUserDTO) {
+        try {
+            if (newUserDTO.getEmail() == null || newUserDTO.getEmail().isEmpty()) {
+                log.error("No recipient email address found. Email cannot be sent.");
+                return;
+            }
+
+            EmailDetails emailDetails = new EmailDetails(
+                    "noreply@example.com",
+                    newUserDTO.getEmail(),
+                    "Welcome!",
+                    "Hello " + newUserDTO.getUsername() + ", welcome to our platform!"
+            );
+
+            sendEmail(emailDetails);
+            log.info("Welcome email sent successfully to: " + emailDetails.getTo());
+        } catch (Exception e) {
+            log.error("Error processing user registration message: ", e);
+        }
+    }
 
     @RabbitListener(queues = "createOrder")
     public void receiveOrder(NewOrderEntityDTO newOrderEntityDTO) {
@@ -36,7 +57,9 @@ public class EmailServiceImpl implements EmailService {
             throw new RuntimeException("Received null order data from RabbitMQ");
         }
 
-        StringBuilder body = getStringBuilder(newOrderEntityDTO);
+        String userEmail = newOrderEntityDTO.getUserEmail();
+
+        StringBuilder body = getStringBuilder(newOrderEntityDTO, userEmail);
 
         PdfGenerator pdfGenerator = new PdfGenerator();
 
@@ -49,18 +72,15 @@ public class EmailServiceImpl implements EmailService {
 
         EmailDetails emailDetails = new EmailDetails();
         emailDetails.setFrom(sender);
-        emailDetails.setTo(newOrderEntityDTO.getUserEmail());
+        emailDetails.setTo(userEmail);
         emailDetails.setSubject("Order Confirmation");
         emailDetails.setBody(body.toString());
 
-        sendEmailWithAttachment(emailDetails.getTo(),
-                                emailDetails.getSubject(),
-                                emailDetails.getBody(),
-                                pdfPath);
+        sendEmailWithAttachment(emailDetails.getTo(), emailDetails.getSubject(), emailDetails.getBody(), pdfPath);
     }
 
-    private static StringBuilder getStringBuilder(NewOrderEntityDTO newOrderEntityDTO) {
-        StringBuilder body = new StringBuilder("Dear " + newOrderEntityDTO.getUserEmail() + ",\n\n" +
+    private static StringBuilder getStringBuilder(NewOrderEntityDTO newOrderEntityDTO, String userEmail) {
+        StringBuilder body = new StringBuilder("Dear " + userEmail + ",\n\n" +
                 "Your order has been created successfully. Your order status is: " +
                 newOrderEntityDTO.getStatus() + ".\n\n");
 
@@ -112,27 +132,7 @@ public class EmailServiceImpl implements EmailService {
         }
     }
 
-    @RabbitListener(queues = "registerUser")
-    public void processUserRegistration(NewUserEntityDTO newUserDTO) {
-        try {
-            if (newUserDTO.getEmail() == null || newUserDTO.getEmail().isEmpty()) {
-                log.error("No recipient email address found. Email cannot be sent.");
-                return;
-            }
-
-            EmailDetails emailDetails = new EmailDetails(
-                    "noreply@example.com",
-                    newUserDTO.getEmail(),
-                    "Welcome!",
-                    "Hello " + newUserDTO.getUsername() + ", welcome to our platform!"
-            );
-
-            sendEmail(emailDetails);
-            log.info("Welcome email sent successfully to: " + emailDetails.getTo());
-        } catch (Exception e) {
-            log.error("Error processing user registration message: ", e);
-        }
-    }
+    /// Service implementation
 
     @Override
     public void sendEmail(EmailDetails emailDetails) {
