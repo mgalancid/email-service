@@ -1,14 +1,22 @@
 package com.mindhub.email_service.dtos;
 
+import java.io.Serializable;
 import java.util.List;
 
-public class OrderToEmailDTO {
+public class OrderConfirmationEmailDTO implements Serializable {
     private Long orderId;
     private String userEmail;
     private String status;
     private List<OrderItemDTO> products;
 
-    public OrderToEmailDTO(Long orderId, String userEmail, String status, List<OrderItemDTO> products) {
+    public OrderConfirmationEmailDTO() {
+
+    }
+
+    public OrderConfirmationEmailDTO(Long orderId,
+                                     String userEmail,
+                                     String status,
+                                     List<OrderItemDTO> products) {
         this.orderId = orderId;
         this.userEmail = userEmail;
         this.status = status;
