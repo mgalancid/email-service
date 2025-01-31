@@ -53,7 +53,6 @@ public class EmailServiceImpl implements EmailService {
 
     @RabbitListener(queues = "createOrder")
     public void receiveOrder(NewOrderEntityDTO newOrderEntityDTO) {
-        System.out.println(newOrderEntityDTO);
         if (newOrderEntityDTO == null) {
             throw new RuntimeException("Received null order data from RabbitMQ");
         }
@@ -103,20 +102,20 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @RabbitListener(queues = "confirmOrder")
-    public void processOrderConfirmation(OrderEntityDTO orderEntityDTO) {
+    public void processOrderConfirmation(OrderConfirmationEmailDTO orderConfirmationEmailDTO) {
         try {
-            if (orderEntityDTO == null) {
+            if (orderConfirmationEmailDTO == null) {
                 log.error("Received null order confirmation data from RabbitMQ");
                 return;
             }
 
             StringBuilder body = new StringBuilder("Dear Customer,\n\n" +
-                    "Your order with ID " + orderEntityDTO.getId() + " has been confirmed.\n" +
-                    "The current status of your order is: " + orderEntityDTO.getStatus() + ".\n\n");
+                    "Your order with ID " + orderConfirmationEmailDTO.getOrderId() + " has been confirmed.\n" +
+                    "The current status of your order is: " + orderConfirmationEmailDTO.getStatus() + ".\n\n");
 
             body.append("Order Details:\n");
 
-            for (OrderItemDTO item : orderEntityDTO.getProducts()) {
+            for (OrderItemDTO item : orderConfirmationEmailDTO.getProducts()) {
                 body.append("- Product ID: ")
                         .append(item.getProductId())
                         .append(", Quantity: ")
@@ -126,12 +125,14 @@ public class EmailServiceImpl implements EmailService {
             body.append("\nThank you for shopping with us!");
 
             EmailDetails emailDetails = new EmailDetails();
-            emailDetails.setFrom("noreply@example.com");
+            emailDetails.setFrom(sender);
+            emailDetails.setTo(orderConfirmationEmailDTO.getUserEmail());
             emailDetails.setSubject("Order Confirmation");
             emailDetails.setBody(body.toString());
 
             sendEmail(emailDetails);
             log.info("Confirmation email sent successfully to: " + emailDetails.getTo());
+
         } catch (Exception e) {
             log.error("Error processing order confirmation message: ", e);
         }
