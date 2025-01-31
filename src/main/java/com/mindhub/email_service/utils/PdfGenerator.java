@@ -7,6 +7,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 
 import java.io.File;
+import java.util.stream.Collectors;
 
 public class PdfGenerator {
 
@@ -15,20 +16,26 @@ public class PdfGenerator {
             throw new IllegalArgumentException("Order details cannot be null.");
         }
 
-        StringBuilder htmlContent = new StringBuilder();
-        htmlContent.append("<html><body>");
-        htmlContent.append("<h1>Order Confirmation</h1>");
-        htmlContent.append("<p>User: ").append(orderDetails.getUserEmail()).append("</p>");
-        htmlContent.append("<h3>Products:</h3>");
-        htmlContent.append("<ul>");
-
-        for (NewOrderItemEntityDTO item : orderDetails.getProducts()) {
-            htmlContent.append("<li>Product ID: ").append(item.getProductId())
-                    .append(", Quantity: ").append(item.getQuantity()).append("</li>");
-        }
-
-        htmlContent.append("</ul>");
-        htmlContent.append("</body></html>");
+        String htmlContent = String.format(
+                "<html><body>" +
+                        "<h1>Order Confirmation</h1>" +
+                        "<p>User: %s</p>" +
+                        "<h3>Products:</h3>" +
+                        "<table border='1' cellspacing='0' cellpadding='5'>" +
+                        "<tr>" +
+                        "<th>Product ID</th>" +
+                        "<th>Quantity</th>" +
+                        "</tr>" +
+                        "%s" +
+                        "</table>" +
+                        "</body></html>",
+                orderDetails.getUserEmail(),
+                orderDetails.getProducts().stream()
+                        .map(item -> String.format(
+                                "<tr><td>%d</td><td>%d</td></tr>",
+                                item.getProductId(), item.getQuantity()))
+                        .collect(Collectors.joining())
+        );
 
         String pdfPath = "/tmp/order-" + orderDetails.getUserEmail() + ".pdf";
         File pdfFile = new File(pdfPath);
